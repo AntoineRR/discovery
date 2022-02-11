@@ -4,6 +4,8 @@
 use cortex_m_rt::entry;
 use rtt_target::rtt_init_print;
 use panic_rtt_target as _;
+use core::fmt::Write;
+use heapless::Vec;
 
 #[cfg(feature = "v1")]
 use microbit::{
@@ -50,8 +52,25 @@ fn main() -> ! {
         UartePort::new(serial)
     };
 
-    nb::block!(serial.write(b'X')).unwrap();
-    nb::block!(serial.flush()).unwrap();
+    let mut buffer: Vec<char, 32> = Vec::new();
 
-    loop {}
+    loop {
+        buffer.clear();
+
+        while let Ok(b) = nb::block!(serial.read()) {
+            if b == 13 {
+                break;
+            } else {
+                if buffer.push(b as char).is_err() {
+                    break;
+                }
+            }
+        }
+
+        for c in buffer.iter().rev() {
+            write!(serial, "{}", c).unwrap();
+        }
+        
+        nb::block!(serial.flush()).unwrap();
+    }
 }
